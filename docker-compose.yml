@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: rfid_tracking
+      POSTGRES_USER: rfid_user
+      POSTGRES_PASSWORD: rfid_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - rfid_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rfid_user -d rfid_tracking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build: ./backend
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: rfid_tracking
+      DB_USER: rfid_user
+      DB_PASSWORD: rfid_password
+      JWT_SECRET: your_production_jwt_secret_change_this
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost
+    ports:
+      - "5000:5000"
+    networks:
+      - rfid_network
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+    ports:
+      - "80:80"
+    networks:
+      - rfid_network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    networks:
+      - rfid_network
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+networks:
+  rfid_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  backend_logs:
+  redis_data:

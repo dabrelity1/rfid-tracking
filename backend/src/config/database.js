@@ -15,7 +15,11 @@ const connectDB = async () => {
     logger.info('PostgreSQL connected successfully');
   } catch (error) {
     logger.error('Database connection failed:', error);
-    process.exit(1);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      logger.warn('Running in development mode without database connection');
+    }
   }
 };
 
